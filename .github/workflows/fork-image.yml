@@ -5,10 +5,15 @@
 name: Fork controller image
 
 on:
-  push:
-    branches:
-      - fix/waiting-requeue-not-backoff-b7d3b7d
+  # Dispatch-only (2026-09-17): a push-triggered build re-pushed the SAME tag with a
+  # new digest on every branch touch. Pass the tag explicitly; the default is the
+  # tag the ops platform pins in deployments/clusters/base/platform/substrate.yaml.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to push (ghcr.io/antonioacg/objectstorage-controller:<tag>)"
+        required: true
+        default: "v0.2.0-rc1-b7d3b7d-fix.1"
 
 permissions:
   contents: read
@@ -42,4 +47,10 @@ jobs:
           file: controller/Dockerfile
           platforms: linux/arm64,linux/amd64
           push: true
-          tags: ghcr.io/antonioacg/objectstorage-controller:v0.2.0-rc1-b7d3b7d-fix.1
+          tags: ghcr.io/antonioacg/objectstorage-controller:${{ inputs.tag }}
+          # The source label is what links the ghcr package to THIS repo (GitHub docs:
+          # a container package connects to the repo named by
+          # org.opencontainers.image.source on push, once any old link is removed).
+          labels: |
+            org.opencontainers.image.source=https://github.com/antonioacg/container-object-storage-interface
+            org.opencontainers.image.description=COSI controller, fork build: upstream pin + WaitingError steady-requeue carry (ops UP-09)
