@@ -1,0 +1,56 @@
+# Fork-only workflow (antonioacg/container-object-storage-interface): build and
+# push the patched controller image to ghcr for the ops platform's `cosi`
+# Kustomization image override. Not intended for upstream — delete from any
+# upstream PR branch.
+name: Fork controller image
+
+on:
+  # Dispatch-only (2026-09-17): a push-triggered build re-pushed the SAME tag with a
+  # new digest on every branch touch. Pass the tag explicitly; the default is the
+  # tag the ops platform pins in deployments/clusters/base/platform/substrate.yaml.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to push (ghcr.io/antonioacg/objectstorage-controller:<tag>)"
+        required: true
+        default: "v0.2.0-rc1-67cfa8d-fix.1"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push controller image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: controller/Dockerfile
+          platforms: linux/arm64,linux/amd64
+          push: true
+          tags: ghcr.io/antonioacg/objectstorage-controller:${{ inputs.tag }}
+          # The source label is what links the ghcr package to THIS repo (GitHub docs:
+          # a container package connects to the repo named by
+          # org.opencontainers.image.source on push, once any old link is removed).
+          labels: |
+            org.opencontainers.image.source=https://github.com/antonioacg/container-object-storage-interface
+            org.opencontainers.image.description=COSI controller, fork build: upstream pin + WaitingError steady-requeue carry (ops UP-09)
